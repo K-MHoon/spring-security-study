@@ -2,6 +2,7 @@ package com.example.springsecuritystudy.config;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
@@ -17,11 +18,15 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     private final UserDetailsService userDetailsService;
 
     @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        // 인가
-        http.authorizeRequests()
-                .anyRequest().authenticated();
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        // 임시 사용자 목록 생성
+        auth.inMemoryAuthentication().withUser("user").password("{noop}1111").roles("USER");
+        auth.inMemoryAuthentication().withUser("sys").password("{noop}1111").roles("SYS");
+        auth.inMemoryAuthentication().withUser("admin").password("{noop}1111").roles("ADMIN");
+    }
 
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
         // 로그인 인증
         http.formLogin()
 //                .loginPage("/loginPage") // 커스텀한 로그인 페이지 설정 가능 (로그인 해야될 경우 보이는 화면)
@@ -65,5 +70,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .and()
                 .sessionFixation() // 세션 고정 보호
                 .changeSessionId(); // 로그인할 때마다 새로운 세션을 발급한다.
+
+        // 권한 분리
+        http.authorizeRequests()
+                .antMatchers("/user").hasRole("USER")
+                .antMatchers("/admin/pay").hasRole("ADMIN")
+                .antMatchers("/admin/**").access("hasRole('ADMIN') or hasRole('SYS')")
+                .anyRequest().authenticated();
     }
 }
