@@ -2,13 +2,23 @@ package com.example.springsecuritystudy.config;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.io.IOException;
 
 @EnableWebSecurity
 @Configuration
@@ -37,7 +47,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .loginProcessingUrl("/login_proc")
                 .successHandler((request, response, authentication) -> { // 로그인 성공했을 경우
                     System.out.println("authentication" + authentication.getName());
-                    response.sendRedirect("/"); // root 페이지로 이동
+                    // 사용자가 원래 가고자 했던 정보를 가지고 있음.
+                    HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
+                    SavedRequest savedRequest = requestCache.getRequest(request, response);
+                    String redirectUrl = savedRequest.getRedirectUrl();
+                    response.sendRedirect(redirectUrl);
                 })
                 .failureHandler((request, response, exception) -> { // 로그인 실패했을 경우
                     System.out.println("exception" + exception.getMessage());
@@ -73,9 +87,18 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
         // 권한 분리
         http.authorizeRequests()
+                .antMatchers("/login").permitAll()
                 .antMatchers("/user").hasRole("USER")
                 .antMatchers("/admin/pay").hasRole("ADMIN")
                 .antMatchers("/admin/**").access("hasRole('ADMIN') or hasRole('SYS')")
                 .anyRequest().authenticated();
+
+        // 인증, 인가 예외처리
+        http
+                .exceptionHandling()
+//                .authenticationEntryPoint((request, response, authException) ->
+//                        response.sendRedirect("/login"))
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                        response.sendRedirect("/denied"));
     }
 }
